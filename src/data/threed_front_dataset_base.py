@@ -321,7 +321,7 @@ class Rotation(DatasetDecoratorBase):
     def __getitem__(self, idx):
         # Get the rotation matrix for the current scene
         if self._fixed:
-            rot_angle = self.fixed_rot_angle
+            rot_angle = 0.0# self.fixed_rot_angle
         else:
             rot_angle = self.rot_angle
         R = Rotation.rotation_matrix_around_y(rot_angle)

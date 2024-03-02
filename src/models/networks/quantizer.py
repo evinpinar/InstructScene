@@ -103,8 +103,13 @@ class GumbelQuantize(nn.Module):
             indices = self.unmap_to_all(indices)
             indices = indices.reshape(-1)  # (B*N,)
 
+        # Commonscenes: Omit floor indices -1
+        valid_indices_mask = indices != -1
+        indices = torch.where(valid_indices_mask, indices, torch.tensor(0))
+
         # Get quantized latent vectors
         one_hot: Tensor = F.one_hot(indices, num_classes=self.n_embed).float()   # (B*N, M)
+        one_hot = torch.where(valid_indices_mask.unsqueeze(-1), one_hot, torch.tensor(0.0))
         z_q = one_hot @ self.embed.weight  # (B*N, M) @ (M, D) -> (B*N, D)
         z_q = z_q.view(*shape, -1)  # (B, N, D)
         return z_q

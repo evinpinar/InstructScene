@@ -215,12 +215,17 @@ class ThreedFront(BaseDataset):
     # Set the predicate types for scene graphs of 3D-FRONT
     @property
     def predicate_types(self):
-        return [
-            "above", "left of", "in front of",
-            "closely left of", "closely in front of",
-            "below", "right of", "behind",
-            "closely right of", "closely behind"
-        ]
+        # return [
+        #     "above", "left of", "in front of",
+        #     "closely left of", "closely in front of",
+        #     "below", "right of", "behind",
+        #     "closely right of", "closely behind"
+        # ]
+        # SG-FRONT from COMMONSCENES
+        return ["left", "right", "front", "behind",
+                "close by", "above", "standing on", "bigger than",
+                "smaller than", "taller than", "shorter than", "symmetrical to",
+                "same style as", "same super category as", "same material as"]
 
     ################################ For InstructScene END ################################
 

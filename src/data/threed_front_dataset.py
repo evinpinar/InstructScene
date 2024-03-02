@@ -29,7 +29,7 @@ class SG2SC(DatasetDecoratorBase):
         ]
         # Permutation augmentation
         if "permutation" in sample_params:
-            objfeat_vq_indices = [objfeat_vq_indices[i] for i in sample_params["permutation"]]
+            objfeat_vq_indices = [objfeat_vq_indices[i] if i < len(objfeat_vq_indices) else np.array([-1,-1,-1,-1]) for i in sample_params["permutation"]]
 
         sample_params_new["objfeat_vq_indices"] = np.vstack(objfeat_vq_indices)  # (n, k)
 
@@ -93,11 +93,11 @@ class SG2SC(DatasetDecoratorBase):
 
             edges = self.n_predicate_types * np.ones((max_length, max_length), dtype=np.int64)  # (n, n)
             for s, p, o in triples:
-                rev_p = self.predicate_types.index(
-                    reverse_rel(self.predicate_types[p])
-                )
                 edges[s, o] = p
-                edges[o, s] = rev_p
+                # rev_p = self.predicate_types.index(
+                #     reverse_rel(self.predicate_types[p])
+                # )0
+                # edges[o, s] = rev_p
             sample_params_pad["edges"].append(edges)
 
             objfeat_vq_indices = sample_params["objfeat_vq_indices"]

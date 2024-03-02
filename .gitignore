@@ -5,3 +5,5 @@ out/
 dataset/3D-FRONT
 dataset/InstructScene
 blender/blender-*
+dataset/get_3dfuture_pkl.py
+.idea

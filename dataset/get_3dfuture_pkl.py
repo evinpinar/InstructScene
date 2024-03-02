@@ -16,7 +16,7 @@ def main(argv):
     parser.add_argument(
         "room_type",
         default="bedroom",
-        choices=["bedroom", "livingroom", "diningroom"],
+        choices=["bedroom", "livingroom", "diningroom", "all"],
         help="The type of room to pickle"
     )
     parser.add_argument(
@@ -60,7 +60,9 @@ def main(argv):
         choices=[
             "threed_front_bedroom",
             "threed_front_livingroom",
-            "threed_front_diningroom"
+            "threed_front_diningroom",
+            "threed_front_all",
+            "no_filtering"
         ],
         help="The type of dataset filtering to be used"
     )
@@ -72,7 +74,7 @@ def main(argv):
 
     args = parser.parse_args(argv)
     args.annotation_file = f"configs/{args.room_type}_threed_front_splits.csv"
-    args.dataset_filtering = f"threed_front_{args.room_type}"
+    # args.dataset_filtering = f"threed_front_{args.room_type}"
 
     # Check if output directory exists and if it doesn't create it
     if not os.path.exists(args.output_directory):
