@@ -15,7 +15,7 @@ from src.utils.visualize import *
 from src.data import filter_function, get_encoded_dataset, get_dataset_raw_and_encoded
 from src.data.threed_future_dataset import ThreedFutureDataset
 from src.data.threed_front_dataset_base import trs_to_corners
-from src.data.utils_text import compute_loc_rel, reverse_rel
+from src.data.utils_text import compute_loc_rel, reverse_rel, validate_constrains
 from src.models import model_from_config, ObjectFeatureVQVAE
 
 
@@ -236,6 +236,14 @@ def main():
     save_dir = os.path.join(exp_dir, "generated_scenes", f"epoch_{load_epoch:05d}")
     os.makedirs(save_dir, exist_ok=True)
 
+    # Evaluation for scene graph condition
+    accuracy = {}
+    for k in ['left', 'right', 'front', 'behind', 'smaller', 'bigger', 'shorter', 'taller', 'standing on',
+              'close by', 'symmetrical to', 'total']:
+        # compute validation for these relation categories
+        accuracy[k] = []
+    predicate_types = dataset.predicate_types + ["empty"]
+
     # Generate the boxes from scene graphs
     classes = np.array(dataset.object_types)
     rel_counts, rel_count_errors = 0, 0
@@ -306,14 +314,14 @@ def main():
                 verbose=args.verbose
             )
 
-            # Evaluation for scene graph condition
             # 1. Get the decoded scene graphs from generated boxes
             obj_class_ids = [
                 dataset.object_types.index(c) if c is not None
                 else dataset.n_object_types
                 for c in obj_classes
             ]
-            relations = []  # [[cls_id1, pred_id, cls_id2], ...]
+            pred_triples = []  # [[cls_id1, pred_id, cls_id2], ...]
+            pred_boxes = []
             cls_dim = dataset.n_object_types+1
             for idx in range(len(obj_class_ids)):
                 if obj_class_ids[idx] == dataset.n_object_types:  # empty object
@@ -334,33 +342,42 @@ def main():
                     corners2 = trs_to_corners(t2, r2, s2)
                     name2 = dataset.object_types[c2_id]
 
-                    loc_rel_str = compute_loc_rel(corners1, corners2, name1, name2)
-                    if loc_rel_str is not None:
-                        # print(classes[obj_class_ids[idx]], loc_rel_str, classes[obj_class_ids[other_idx]])
-                        relation_id = dataset.predicate_types.index(loc_rel_str)
-                        relations.append([idx, relation_id, other_idx])
-                        # Add the reverse relation
-                        # print(classes[obj_class_ids[other_idx]], reverse_rel(loc_rel_str), classes[obj_class_ids[idx]])
-                        rev_relation_id = dataset.predicate_types.index(reverse_rel(loc_rel_str))
-                        relations.append([other_idx, rev_relation_id, idx])
+                    pred_boxes.append([np.concatenate([s1,t1]), np.concatenate([s2,t2])])
+                    true_edge = batch["edges"][i][idx][other_idx].cpu().numpy().item()
+                    rel_name = predicate_types[true_edge]
+                    pred_triples.append([c1_id, rel_name, name2])
 
-            # 2. Compare the decoded scene graph with the ground truth
-            true_edges = batch["edges"][i].cpu().numpy()
-            edges = dataset.n_predicate_types * np.ones((len(obj_class_ids), len(obj_class_ids)), dtype=np.int64)  # (n, n)
-            for s, p, o in relations:
-                edges[s, o] = p
-            obj_masks = batch["obj_masks"][i].cpu().numpy()  # (n,)
-            edge_masks = obj_masks[:, None] * obj_masks[None, :] * \
-                (~np.eye(len(obj_class_ids), dtype=bool)).astype(np.int64)  # (n, n)
-            true_edges = true_edges * edge_masks
-            edges = edges * edge_masks
+                    # loc_rel_str = compute_loc_rel(corners1, corners2, name1, name2)
+                    # if loc_rel_str is not None:
+                    #     # print(classes[obj_class_ids[idx]], loc_rel_str, classes[obj_class_ids[other_idx]])
+                    #     relation_id = dataset.predicate_types.index(loc_rel_str)
+                    #     relations.append([idx, relation_id, other_idx])
+                    #     # Add the reverse relation
+                    #     # print(classes[obj_class_ids[other_idx]], reverse_rel(loc_rel_str), classes[obj_class_ids[idx]])
+                    #     rev_relation_id = dataset.predicate_types.index(reverse_rel(loc_rel_str))
+                    #     relations.append([other_idx, rev_relation_id, idx])
 
-            num_objs = batch["obj_masks"][i].cpu().numpy().sum()
-            assert edge_masks.sum() == num_objs * (num_objs - 1)
-            assert (edges != true_edges).sum() % 2 == 0  # because of the reverse relations
 
-            rel_counts += edge_masks.sum()
-            rel_count_errors += (edges != true_edges).sum()
+            accuracy = validate_constrains(pred_triples, pred_boxes, pred_angles=None, keep=None,
+                                           accuracy=accuracy)
+
+            # # 2. Compare the decoded scene graph with the ground truth
+            # true_edges = batch["edges"][i].cpu().numpy()
+            # edges = dataset.n_predicate_types * np.ones((len(obj_class_ids), len(obj_class_ids)), dtype=np.int64)  # (n, n)
+            # for s, p, o in relations:
+            #     edges[s, o] = p
+            # obj_masks = batch["obj_masks"][i].cpu().numpy()  # (n,)
+            # edge_masks = obj_masks[:, None] * obj_masks[None, :] * \
+            #     (~np.eye(len(obj_class_ids), dtype=bool)).astype(np.int64)  # (n, n)
+            # true_edges = true_edges * edge_masks
+            # edges = edges * edge_masks
+            #
+            # num_objs = batch["obj_masks"][i].cpu().numpy().sum()
+            # assert edge_masks.sum() == num_objs * (num_objs - 1)
+            # assert (edges != true_edges).sum() % 2 == 0  # because of the reverse relations
+            #
+            # rel_counts += edge_masks.sum()
+            # rel_count_errors += (edges != true_edges).sum()
 
             # print("rel_count_errors", (edges != true_edges).sum(), " |  rel_counts", edge_masks.sum(), "\n")
             # predicate_types = dataset.predicate_types + ["empty"]
@@ -372,9 +389,30 @@ def main():
             #             print()
 
             progress_bar.update(1)
-            progress_bar.set_postfix({
-                "rel_error": "{:.4f}".format(rel_count_errors/rel_counts)
-            })
+            # progress_bar.set_postfix({
+            #     "rel_error": "{:.4f}".format(rel_count_errors/rel_counts)
+            # })
+
+            # progress_bar.set_postfix({
+            #     "rel_error": "{:.4f}".format(accuracy)
+            # })
+
+            keys = list(accuracy.keys())
+            for dic, typ in [(accuracy, "acc")]:
+                lr_mean = np.mean([np.mean(dic[keys[0]]), np.mean(dic[keys[1]])])
+                fb_mean = np.mean([np.mean(dic[keys[2]]), np.mean(dic[keys[3]])])
+                bism_mean = np.mean([np.mean(dic[keys[4]]), np.mean(dic[keys[5]])])
+                tash_mean = np.mean([np.mean(dic[keys[6]]), np.mean(dic[keys[7]])])
+                stand_mean = np.mean(dic[keys[8]])
+                close_mean = np.mean(dic[keys[9]])
+                symm_mean = np.mean(dic[keys[10]])
+                total_mean = np.mean(dic[keys[11]])
+                means_of_mean = np.mean([lr_mean, fb_mean, bism_mean, tash_mean, stand_mean, close_mean, symm_mean])
+                print(
+                    '{} & L/R: {:.2f} & F/B: {:.2f} & Bi/Sm: {:.2f} & Ta/Sh: {:.2f} & Stand: {:.2f} & Close: {:.2f} & Symm: {:.2f}. Total: &{:.2f}'.format(
+                        typ, lr_mean,
+                        fb_mean, bism_mean, tash_mean, stand_mean, close_mean, symm_mean, total_mean))
+                print('means of mean: {:.2f}'.format(means_of_mean))
 
             # Whether to visualize the scene by blender rendering
             if not args.visualize:
@@ -420,9 +458,32 @@ def main():
             break
 
     # Save the evaluation results
-    eval_info = f"Relation count error: [{rel_count_errors:4d}/{rel_counts:4d}] = {rel_count_errors/rel_counts:.4f}\n"
-    with open(os.path.join(save_dir, f"eval_cfg{args.cfg_scale:.1f}.txt"), "w") as f:
-        f.write(eval_info)
+    # eval_info = f"Relation count error: [{rel_count_errors:4d}/{rel_counts:4d}] = {rel_count_errors/rel_counts:.4f}\n"
+    # with open(os.path.join(save_dir, f"eval_cfg{args.cfg_scale:.1f}.txt"), "w") as f:
+    #     f.write(eval_info)
+
+    keys = list(accuracy.keys())
+    file_path_for_output = os.path.join(save_dir, f'accuracy_analysis.txt')
+    with open(file_path_for_output, 'w') as file:
+        for dic, typ in [(accuracy, "acc")]:
+            lr_mean = np.mean([np.mean(dic[keys[0]]), np.mean(dic[keys[1]])])
+            fb_mean = np.mean([np.mean(dic[keys[2]]), np.mean(dic[keys[3]])])
+            bism_mean = np.mean([np.mean(dic[keys[4]]), np.mean(dic[keys[5]])])
+            tash_mean = np.mean([np.mean(dic[keys[6]]), np.mean(dic[keys[7]])])
+            stand_mean = np.mean(dic[keys[8]])
+            close_mean = np.mean(dic[keys[9]])
+            symm_mean = np.mean(dic[keys[10]])
+            total_mean = np.mean(dic[keys[11]])
+            means_of_mean = np.mean([lr_mean, fb_mean, bism_mean, tash_mean, stand_mean, close_mean, symm_mean])
+            print(
+                '{} & L/R: {:.2f} & F/B: {:.2f} & Bi/Sm: {:.2f} & Ta/Sh: {:.2f} & Stand: {:.2f} & Close: {:.2f} & Symm: {:.2f}. Total: &{:.2f}'.format(
+                    typ, lr_mean,
+                    fb_mean, bism_mean, tash_mean, stand_mean, close_mean, symm_mean, total_mean))
+            print('means of mean: {:.2f}'.format(means_of_mean))
+            file.write(
+                '{} & L/R: {:.2f} & F/B: {:.2f} & Bi/Sm: {:.2f} & Ta/Sh: {:.2f} & Stand: {:.2f} & Close: {:.2f} & Symm: {:.2f}. Total: &{:.2f}\n'.format(
+                    typ, lr_mean, fb_mean, bism_mean, tash_mean, stand_mean, close_mean, symm_mean, total_mean))
+            file.write('means of mean: {:.2f}\n\n'.format(means_of_mean))
 
 if __name__ == "__main__":
     main()

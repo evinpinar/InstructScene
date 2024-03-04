@@ -8,7 +8,7 @@ data:
     path_to_invalid_bbox_jids: "configs/black_list.txt"
     path_to_floor_plan_textures: "configs/floor_plan_texture_images"
     path_to_pickled_3d_futute_models: "dataset/InstructScene/threed_future_model_all.pkl"
-    filter_fn: "no_filtering"
+    filter_fn: "threed_front_all"
     train_stats: "dataset_stats.txt"
     room_layout_size: "64,64"
     max_length: 12

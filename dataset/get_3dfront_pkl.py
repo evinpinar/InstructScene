@@ -2,12 +2,12 @@ from src.data import filter_function
 from src.data.threed_front import ThreedFront
 
 config = {
-    "filter_fn":                 "threed_front_bedroom",
+    "filter_fn":                 "threed_front_all",
     "min_n_boxes":               -1,
     "max_n_boxes":               -1,
     "path_to_invalid_scene_ids": "configs/invalid_threed_front_rooms.txt",
     "path_to_invalid_bbox_jids": "configs/black_list.txt",
-    "annotation_file":           "configs/bedroom_threed_front_splits.csv"
+    "annotation_file":           "configs/all_threed_front_splits.csv"
 }
 
 dataset = ThreedFront.from_dataset_directory(

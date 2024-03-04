@@ -11,7 +11,8 @@ import pickle
 
 import torch
 from .utils import parse_threed_future_models
-
+from .mapping import sgfront_class_mapping
+from .base import THREED_FRONT_ALL_FURNITURE
 
 class ThreedFutureDataset(object):
     def __init__(self, objects):
@@ -31,7 +32,7 @@ class ThreedFutureDataset(object):
 
     def _filter_objects_by_label(self, label):
         if label is not None:
-            return [oi for oi in self.objects if oi.label == label]
+            return [oi for oi in self.objects if sgfront_class_mapping[oi.label] == label]
         else:  # return all objects if `label` is not specified
             return [oi for oi in self.objects]
 

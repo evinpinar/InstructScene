@@ -179,5 +179,75 @@ def filter_function(config, split=["train", "val"], without_lamps=False):
             ),
             BaseDataset.with_scene_ids(split_scene_ids)
         )
+    elif "threed_front_all" in config["filter_fn"]:
+        livingroom_dataset = BaseDataset.filter_compose(
+            BaseDataset.with_room("living"),
+            BaseDataset.at_least_boxes(3),
+            BaseDataset.at_most_boxes(21),
+            BaseDataset.with_object_types(
+                list(THREED_FRONT_LIVINGROOM_FURNITURE.keys())
+            ),
+            BaseDataset.with_generic_classes(
+                THREED_FRONT_LIVINGROOM_FURNITURE
+            ),
+            BaseDataset.with_valid_scene_ids(invalid_scene_ids),
+            BaseDataset.with_valid_bbox_jids(invalid_bbox_jids),
+            BaseDataset.room_smaller_than_along_axis(4.0, axis=1),
+            BaseDataset.room_larger_than_along_axis(-0.005, axis=1),
+            BaseDataset.floor_plan_with_limits(12, 12, axis=[0, 2]),
+            BaseDataset.without_box_types(
+                ["ceiling_lamp", "pendant_lamp"]
+                if without_lamps else [""]
+            ),
+            BaseDataset.with_scene_ids(split_scene_ids)
+        )
+
+        bedroom_data = BaseDataset.filter_compose(
+            BaseDataset.with_room("bed"),
+            BaseDataset.at_least_boxes(3),
+            BaseDataset.at_most_boxes(13),
+            BaseDataset.with_object_types(
+                list(THREED_FRONT_BEDROOM_FURNITURE.keys())
+            ),
+            BaseDataset.with_generic_classes(THREED_FRONT_BEDROOM_FURNITURE),
+            BaseDataset.with_valid_scene_ids(invalid_scene_ids),
+            BaseDataset.with_valid_bbox_jids(invalid_bbox_jids),
+            BaseDataset.contains_object_types(
+                ["double_bed", "single_bed", "kids_bed"]
+            ),
+            BaseDataset.room_smaller_than_along_axis(4.0, axis=1),
+            BaseDataset.room_larger_than_along_axis(-0.005, axis=1),
+            BaseDataset.floor_plan_with_limits(6, 6, axis=[0, 2]),
+            BaseDataset.without_box_types(
+                ["ceiling_lamp", "pendant_lamp"]
+                if without_lamps else [""]
+            ),
+            BaseDataset.with_scene_ids(split_scene_ids)
+        )
+
+        dining_dataset = BaseDataset.filter_compose(
+            BaseDataset.with_room("dining"),
+            BaseDataset.at_least_boxes(3),
+            BaseDataset.at_most_boxes(21),
+            BaseDataset.with_object_types(
+                list(THREED_FRONT_LIVINGROOM_FURNITURE.keys())
+            ),
+            BaseDataset.with_generic_classes(
+                THREED_FRONT_LIVINGROOM_FURNITURE
+            ),
+            BaseDataset.with_valid_scene_ids(invalid_scene_ids),
+            BaseDataset.with_valid_bbox_jids(invalid_bbox_jids),
+            BaseDataset.room_smaller_than_along_axis(4.0, axis=1),
+            BaseDataset.room_larger_than_along_axis(-0.005, axis=1),
+            BaseDataset.floor_plan_with_limits(12, 12, axis=[0, 2]),
+            BaseDataset.without_box_types(
+                ["ceiling_lamp", "pendant_lamp"]
+                if without_lamps else [""]
+            ),
+            BaseDataset.with_scene_ids(split_scene_ids)
+        )
+
+        return dining_dataset or bedroom_data or livingroom_dataset
+
     elif config["filter_fn"] == "non_empty":
         return lambda s: s if len(s.bboxes) > 0 else False

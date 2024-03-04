@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 import trimesh
 from imageio import imread
 import torch
-
+from src.data.mapping import sgfront_class_mapping
 
 def get_textured_objects(
     bbox_params_t: ndarray,
@@ -68,6 +68,8 @@ def get_textured_objects(
         else:
             query_label = None
         if obj_features is not None:
+            if query_label == "floor":
+                continue
             query_feature = obj_features[j]
             furniture, select_gap = objects_dataset.get_closest_furniture_to_objfeat_and_size(query_label, query_size, query_feature, objfeat_type)
         else:
@@ -86,7 +88,7 @@ def get_textured_objects(
                     j, select_gap
                 ))
 
-        obj_classes.append(furniture.label)
+        obj_classes.append(sgfront_class_mapping[furniture.label])
         obj_sizes.append(furniture.size)
 
         # Extract the predicted affine transformation to position the mesh
@@ -129,7 +131,7 @@ def get_textured_objects(
     if verbose and j == bbox_params_t.shape[1]-1:
         print()  # newline at the end
 
-    assert bbox_params_t.shape[0] == len(obj_classes) == len(obj_sizes) >= len(trimesh_meshes)
+    assert bbox_params_t.shape[0] -1 == len(obj_classes) == len(obj_sizes) >= len(trimesh_meshes)
     return trimesh_meshes, bbox_meshes, obj_classes, obj_sizes, obj_ids
 
 
